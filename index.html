@@ -77,7 +77,7 @@
             });
         }
 
-        function showGallery(photoList) {
+function showGallery(photoList) {
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('gallery-screen').style.display = 'block';
             
@@ -88,21 +88,50 @@
                 const card = document.createElement('div');
                 card.className = 'photo-card';
 
-                // 画像を表示するためのURL (GASのdoGet経由)
-                const imageUrl = `${GAS_URL}?fileId=${photo.fileId}`;
-                
-                // ダウンロード用リンク（本来のダウンロードURLはDriveの仕様によるが、ここでは画像URLを直接開く形式を採用）
-                // ※別タブで開いて保存してもらう形式が最も安定します
-                
+                // 初期状態は「読み込み中...」と表示し、IDを付与しておく
+                const imgId = `img-${photo.fileId}`;
+                const linkId = `link-${photo.fileId}`;
+
                 card.innerHTML = `
-                    <img src="${imageUrl}" loading="lazy" alt="${photo.filename}">
+                    <div style="height:200px; display:flex; align-items:center; justify-content:center; background:#eee;" id="placeholder-${photo.fileId}">
+                        読み込み中...
+                    </div>
+                    <img id="${imgId}" style="display:none;" alt="${photo.filename}">
                     <span class="serial-number">No. ${photo.id}</span>
-                    <a href="${imageUrl}" target="_blank" class="download-btn" download="${photo.filename}">ダウンロード</a>
+                    <a id="${linkId}" href="#" class="download-btn" style="display:none;">ダウンロード</a>
                 `;
                 
                 container.appendChild(card);
+
+                // 画像データを個別に取得しに行く
+                loadImage(photo.fileId, imgId, linkId, `placeholder-${photo.fileId}`);
             });
         }
-    </script>
+
+        function loadImage(fileId, imgId, linkId, placeholderId) {
+            // GETリクエストでBase64データを取得
+            fetch(`${GAS_URL}?fileId=${fileId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const img = document.getElementById(imgId);
+                    const link = document.getElementById(linkId);
+                    const placeholder = document.getElementById(placeholderId);
+                    
+                    // Base64を画像ソースとしてセット
+                    const dataUrl = `data:${data.mime};base64,${data.data}`;
+                    
+                    img.src = dataUrl;
+                    img.style.display = 'block'; // 画像を表示
+                    placeholder.style.display = 'none'; // ローディングを消す
+
+                    // ダウンロードリンクの設定
+                    link.href = dataUrl;
+                    link.download = data.filename;
+                    link.style.display = 'inline-block';
+                }
+            })
+            .catch(err => console.error("Image load error:", err));
+        }    </script>
 </body>
 </html>
