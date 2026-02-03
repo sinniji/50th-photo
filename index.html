@@ -188,39 +188,67 @@ function showGallery(photoList) {
     const container = document.getElementById('photo-container');
     container.innerHTML = ""; 
 
+    // ★追加: 監視役（オブザーバー）を作成
+    // 画面に「カード」が少しでも見えたらコールバック関数を実行する
+    const observer = new IntersectionObserver((entries, obs) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                // 画面に見えた要素だけ処理を実行
+                const card = entry.target;
+                const fileId = card.dataset.fileid;
+                const imgId = card.dataset.imgid;
+                const placeholderId = card.dataset.placeholderid;
+                const linkId = card.dataset.linkid;
+                const filename = card.dataset.filename;
+
+                // まだ読み込んでいない場合のみ読み込む
+                if (!card.dataset.loaded) {
+                    loadThumbnail(fileId, imgId, placeholderId, linkId, filename);
+                    card.dataset.loaded = "true"; // 読み込み済みフラグを立てる
+                }
+
+                // 監視を解除（もう読み込んだので）
+                obs.unobserve(card);
+            }
+        });
+    });
+
     photoList.forEach(photo => {
         const card = document.createElement('div');
         card.className = 'photo-card';
         card.id = `card-${photo.id}`;
 
+        // ★追加: データ属性に情報を一時保存しておく（監視役が使うため）
         const imgId = `img-${photo.fileId}`;
         const linkId = `dl-${photo.fileId}`;
         const placeholderId = `place-${photo.fileId}`;
+        
+        card.dataset.fileid = photo.fileId;
+        card.dataset.imgid = imgId;
+        card.dataset.placeholderid = placeholderId;
+        card.dataset.linkid = linkId;
+        card.dataset.filename = photo.filename;
 
-        // カード生成
+        // カード生成（中身は同じ）
         card.innerHTML = `
             <div class="img-area" onclick="toggleSelection('${photo.id}')">
                 <div class="check-mark">✔</div>
-                
                 <div id="${placeholderId}" style="height:160px; display:flex; align-items:center; justify-content:center; background:#eee; color:#999;">
-                    <span style="font-size:12px;">読込中...</span>
+                    <span style="font-size:12px;">待機中...</span>
                 </div>
-                
                 <img id="${imgId}" style="display:none; width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:4px;" alt="${photo.filename}">
             </div>
-            
             <span class="serial-number">No. ${photo.id}</span>
-            
             <a id="${linkId}" href="#" class="download-btn" style="background-color:#6c757d;">ダウンロード準備中</a>
         `;
         
         container.appendChild(card);
 
-        // 1. まずサムネイルだけ読み込む (軽い)
-        loadThumbnail(photo.fileId, imgId, placeholderId, linkId, photo.filename);
+        // ★変更: すぐに loadThumbnail を呼ばず、監視役(observer)に登録するだけにする
+        observer.observe(card);
     });
 }
-
+        
 // サムネイル読み込み (一覧表示用)
 function loadThumbnail(fileId, imgId, placeholderId, linkId, filename) {
     // type=thumb を付与
