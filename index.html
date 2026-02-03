@@ -180,78 +180,104 @@
         }
 
         // --- ギャラリー表示処理 ---
-        function showGallery(photoList) {
-            // 画面切り替え
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('gallery-screen').style.display = 'block';
-            
-            const container = document.getElementById('photo-container');
-            container.innerHTML = ""; // クリア
+function showGallery(photoList) {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('gallery-screen').style.display = 'block';
+        
+        const container = document.getElementById('photo-container');
+        container.innerHTML = ""; 
 
-            photoList.forEach(photo => {
-                // カード要素作成
-                const card = document.createElement('div');
-                card.className = 'photo-card';
-                card.id = `card-${photo.id}`; // 選択スタイル用ID
+        photoList.forEach(photo => {
+            const card = document.createElement('div');
+            card.className = 'photo-card';
+            card.id = `card-${photo.id}`;
 
-                const imgId = `img-${photo.fileId}`;
-                const linkId = `dl-${photo.fileId}`;
-                const placeholderId = `place-${photo.fileId}`;
+            const imgId = `img-${photo.fileId}`;
+            const placeholderId = `place-${photo.fileId}`;
 
-                card.innerHTML = `
-                    <div class="img-area" onclick="toggleSelection('${photo.id}')">
-                        <div class="check-mark">✔</div>
-                        
-                        <div id="${placeholderId}" style="height:160px; display:flex; align-items:center; justify-content:center; background:#eee; color:#999;">
-                            <span style="font-size:12px;">読込中...</span>
-                        </div>
-                        
-                        <img id="${imgId}" style="display:none; width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:4px;" alt="${photo.filename}">
+            card.innerHTML = `
+                <div class="img-area" onclick="toggleSelection('${photo.id}')">
+                    <div class="check-mark">✔</div>
+                    
+                    <div id="${placeholderId}" style="height:160px; display:flex; align-items:center; justify-content:center; background:#eee; color:#999;">
+                        <span style="font-size:12px;">読込中...</span>
                     </div>
                     
-                    <span class="serial-number">No. ${photo.id}</span>
-                    
-                    <a id="${linkId}" href="#" class="download-btn disabled" download="${photo.filename}">ダウンロード</a>
-                `;
+                    <img id="${imgId}" style="display:none; width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:4px;" alt="${photo.filename}">
+                </div>
                 
-                container.appendChild(card);
+                <span class="serial-number">No. ${photo.id}</span>
+                
+                <button class="download-btn" onclick="downloadFullImage('${photo.fileId}', '${photo.filename}')">
+                    ダウンロード
+                </button>
+            `;
+            
+            container.appendChild(card);
 
-                // 画像の実体を遅延ロード
-                loadImage(photo.fileId, imgId, linkId, placeholderId);
-            });
-        }
+            // ★変更点：サムネイルをロードするように指定
+            loadThumbnail(photo.fileId, imgId, placeholderId);
+        });
+    }
 
-        // --- 個別の画像をロードする関数 ---
-        function loadImage(fileId, imgId, linkId, placeholderId) {
-            fetch(`${GAS_URL}?fileId=${fileId}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    const img = document.getElementById(imgId);
-                    const link = document.getElementById(linkId);
-                    const placeholder = document.getElementById(placeholderId);
-                    
-                    // Base64データをセット
-                    const dataUrl = `data:${data.mime};base64,${data.data}`;
-                    
-                    img.src = dataUrl;
-                    img.style.display = 'block';
-                    placeholder.style.display = 'none';
-                    
-                    // ダウンロードリンクを有効化
-                    link.href = dataUrl;
-                    link.classList.remove('disabled');
-                    link.innerText = "ダウンロード";
-                } else {
-                    document.getElementById(placeholderId).innerText = "Err";
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                document.getElementById(placeholderId).innerText = "Fail";
-            });
-        }
+    // --- サムネイル読込用 ---
+    function loadThumbnail(fileId, imgId, placeholderId) {
+        // type=thumb を付与
+        fetch(`${GAS_URL}?fileId=${fileId}&type=thumb`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const img = document.getElementById(imgId);
+                const placeholder = document.getElementById(placeholderId);
+                
+                const dataUrl = `data:${data.mime};base64,${data.data}`;
+                img.src = dataUrl;
+                img.style.display = 'block';
+                placeholder.style.display = 'none';
+            } else {
+                document.getElementById(placeholderId).innerText = "Err";
+            }
+        })
+        .catch(err => {
+            console.error(err);
+        });
+    }
 
+    // --- ★追加：フルサイズダウンロード処理 ---
+    // ボタンを押したときに初めて高画質データを取得しに行く
+    function downloadFullImage(fileId, filename) {
+        const btn = event.target; // クリックされたボタン
+        const originalText = btn.innerText;
+        
+        btn.innerText = "準備中...";
+        btn.disabled = true;
+        btn.style.backgroundColor = "#ccc";
+
+        fetch(`${GAS_URL}?fileId=${fileId}&type=full`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // 一時的なリンクを作成してクリックさせる
+                const link = document.createElement('a');
+                link.href = `data:${data.mime};base64,${data.data}`;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                alert("ダウンロードに失敗しました: " + data.message);
+            }
+        })
+        .catch(err => {
+            alert("通信エラーが発生しました");
+        })
+        .finally(() => {
+            // ボタンを元に戻す
+            btn.innerText = originalText;
+            btn.disabled = false;
+            btn.style.backgroundColor = ""; // CSSのデフォに戻る
+        });
+    }
         // --- 写真の選択/解除処理 ---
         function toggleSelection(id) {
             const card = document.getElementById(`card-${id}`);
