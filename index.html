@@ -1,185 +1,37 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Photo Gallery & Order</title>
-    <style>
-        body { font-family: "Helvetica Neue", Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f4f4f4; color: #333; }
-        h2 { text-align: center; color: #444; }
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzVfaEy_BAO_dNSFXQBgLOM6lBMGaKnX18F4DRrE1g5AsAnvHsPyZ2qSHRTrkxyjHre/exec"; 
 
-        /* --- ログイン画面 --- */
-        #login-screen {
-            max-width: 400px; margin: 100px auto; padding: 30px;
-            background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
+let selectedPhotoIds = [];
+
+function handleLogin() {
+    const password = document.getElementById('password-input').value;
+    const errorMsg = document.getElementById('error-msg');
+    const loading = document.getElementById('loading');
+    
+    errorMsg.innerText = "";
+    loading.style.display = "block";
+
+    fetch(GAS_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "login", password: password })
+    })
+    .then(response => response.json())
+    .then(data => {
+        loading.style.display = "none";
+        if (data.status === 'success') {
+            showGallery(data.data);
+        } else if (data.status === 'auth_failed') {
+            errorMsg.innerText = "パスワードが間違っています。";
+        } else {
+            errorMsg.innerText = "エラー: " + data.message;
         }
-        input[type="password"], input[type="text"] {
-            width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 16px;
-        }
-        button.primary-btn {
-            width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; transition: 0.2s;
-        }
-        button.primary-btn:hover { background-color: #0056b3; }
-        #error-msg { color: #dc3545; margin-top: 15px; font-weight: bold; }
-        #loading { display: none; color: #666; margin-top: 10px; }
+    })
+    .catch(error => {
+        loading.style.display = "none";
+        errorMsg.innerText = "通信エラーが発生しました。";
+        console.error(error);
+    });
+}
 
-        /* --- ギャラリー画面 --- */
-        #gallery-screen { display: none; }
-        
-        .gallery-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-
-        .photo-card {
-            background: white; border: 1px solid #ddd; border-radius: 8px; padding: 10px;
-            transition: all 0.2s ease; position: relative;
-        }
-
-        /* 選択された状態のスタイル */
-        .photo-card.selected {
-            border: 3px solid #007bff; /* 青い枠線 */
-            background-color: #eef6ff;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,123,255,0.3);
-        }
-
-        /* 画像エリア（クリックで選択） */
-        .img-area {
-            cursor: pointer; position: relative; overflow: hidden; border-radius: 4px;
-        }
-        .img-area:hover { opacity: 0.9; }
-
-        /* チェックマーク（選択時のみ表示） */
-        .check-mark {
-            display: none; position: absolute; top: 8px; right: 8px;
-            background: #007bff; color: white; width: 32px; height: 32px;
-            border-radius: 50%; text-align: center; line-height: 32px; font-weight: bold; font-size: 18px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10;
-        }
-        .photo-card.selected .check-mark { display: block; }
-
-        .serial-number {
-            display: block; font-weight: bold; margin-top: 8px; text-align: center; font-size: 1.1em;
-        }
-
-        /* --- ダウンロードボタン（緑色） --- */
-        .download-btn {
-            display: none; /* ロード完了まで隠す */
-            display: block; /* レイアウト確保用 */
-            width: 100%; box-sizing: border-box;
-            margin-top: 10px; padding: 8px;
-            background-color: #28a745; color: white; text-decoration: none;
-            border-radius: 4px; text-align: center; font-size: 14px; font-weight: bold;
-        }
-        .download-btn:hover { background-color: #218838; }
-        .download-btn.disabled { background-color: #ccc; pointer-events: none; }
-
-        /* --- 注文フォームエリア --- */
-        #order-form-container {
-            background: white; padding: 30px; border-radius: 12px; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
-            border-top: 4px solid #ff9900;
-        }
-        .form-group { margin-bottom: 20px; }
-        .form-label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
-        
-        #selected-count-display {
-            font-size: 1.2em; margin-bottom: 20px; padding: 10px; background: #fff3cd; border-radius: 4px; color: #856404;
-        }
-
-        button.order-btn {
-            width: 100%; padding: 15px; background-color: #ff9900; color: white; border: none; border-radius: 6px; font-size: 18px; font-weight: bold; cursor: pointer;
-        }
-        button.order-btn:hover { background-color: #e68a00; }
-        
-    </style>
-</head>
-<body>
-
-    <div id="login-screen">
-        <h2>写真閲覧ページ</h2>
-        <p>パスワードを入力してください</p>
-        <input type="password" id="password-input" placeholder="Password" onkeypress="if(event.key==='Enter') handleLogin()">
-        <button class="primary-btn" onclick="handleLogin()">ログイン</button>
-        <div id="loading">認証中...</div>
-        <div id="error-msg"></div>
-    </div>
-
-    <div id="gallery-screen">
-        <h2>写真一覧</h2>
-        <p style="text-align: center; font-size: 0.9em; color: #666;">
-            写真をクリックすると「注文リスト」に入ります。<br>
-            緑のボタンを押すとすぐにダウンロードできます。
-        </p>
-
-        <div class="gallery-grid" id="photo-container">
-            </div>
-
-        <div id="order-form-container">
-            <h3>📷 写真焼き増し注文フォーム</h3>
-            
-            <div id="selected-count-display">
-                現在選択中の枚数： <span id="selected-count" style="font-weight:bold; font-size:1.5em;">0</span> 枚
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">支部名</label>
-                <input type="text" id="branch-input" placeholder="例: 西京支部">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">お名前</label>
-                <input type="text" id="name-input" placeholder="例: 山田 太郎">
-            </div>
-
-            <button class="order-btn" onclick="submitOrder()">注文を送信する</button>
-            <div id="order-msg" style="margin-top:15px; font-weight:bold; text-align:center;"></div>
-        </div>
-    </div>
-
-    <script>
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbzVfaEy_BAO_dNSFXQBgLOM6lBMGaKnX18F4DRrE1g5AsAnvHsPyZ2qSHRTrkxyjHre/exec"; 
-
-
-        // 選択された写真IDを管理する配列
-        let selectedPhotoIds = [];
-
-        // --- ログイン処理 ---
-        function handleLogin() {
-            const password = document.getElementById('password-input').value;
-            const errorMsg = document.getElementById('error-msg');
-            const loading = document.getElementById('loading');
-            
-            errorMsg.innerText = "";
-            loading.style.display = "block";
-
-            // GASへログインリクエスト送信
-            fetch(GAS_URL, {
-                method: "POST",
-                body: JSON.stringify({ action: "login", password: password })
-            })
-            .then(response => response.json())
-            .then(data => {
-                loading.style.display = "none";
-                if (data.status === 'success') {
-                    showGallery(data.data);
-                } else if (data.status === 'auth_failed') {
-                    errorMsg.innerText = "パスワードが間違っています。";
-                } else {
-                    errorMsg.innerText = "エラー: " + data.message;
-                }
-            })
-            .catch(error => {
-                loading.style.display = "none";
-                errorMsg.innerText = "通信エラーが発生しました。";
-                console.error(error);
-            });
-        }
-
-        // --- ギャラリー表示処理 ---
 function showGallery(photoList) {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('gallery-screen').style.display = 'block';
@@ -192,103 +44,157 @@ function showGallery(photoList) {
         card.className = 'photo-card';
         card.id = `card-${photo.id}`;
 
+        const imgId = `img-${photo.fileId}`;
+        const placeholderId = `place-${photo.fileId}`;
+        const linkId = `dl-${photo.fileId}`;
+
         card.innerHTML = `
             <div class="img-area" onclick="toggleSelection('${photo.id}')">
                 <div class="check-mark">✔</div>
-                <img src="${photo.thumbnailUrl}" 
-                     style="width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:4px;" 
-                     alt="${photo.filename}"
-                     loading="lazy">
+                
+                <div id="${placeholderId}" style="height:160px; display:flex; align-items:center; justify-content:center; background:#eee; color:#999;">
+                    <span style="font-size:12px;">読込中...</span>
+                </div>
+                
+                <img id="${imgId}" style="display:none; width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:4px;" alt="${photo.filename}">
             </div>
             
             <span class="serial-number">No. ${photo.id}</span>
             
-            <a href="${photo.downloadUrl}" class="download-btn" download="${photo.filename}">ダウンロード</a>
+            <a id="${linkId}" href="#" class="download-btn disabled">準備中...</a>
         `;
         
         container.appendChild(card);
+
+        // サムネイル画像をロード
+        loadThumbnail(photo.fileId, imgId, placeholderId, linkId, photo.filename);
     });
 }
 
-        // --- 写真の選択/解除処理 ---
-        function toggleSelection(id) {
-            const card = document.getElementById(`card-${id}`);
+// サムネイル画像をロード
+function loadThumbnail(fileId, imgId, placeholderId, linkId, filename) {
+    fetch(`${GAS_URL}?fileId=${fileId}&type=thumbnail`)
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            const img = document.getElementById(imgId);
+            const placeholder = document.getElementById(placeholderId);
             
-            // 型変換（文字列比較のため）
-            const idStr = String(id);
-
-            if (selectedPhotoIds.includes(idStr)) {
-                // すでに選択済みなら解除
-                selectedPhotoIds = selectedPhotoIds.filter(item => item !== idStr);
-                card.classList.remove('selected');
-            } else {
-                // 未選択なら追加
-                selectedPhotoIds.push(idStr);
-                card.classList.add('selected');
-            }
+            img.src = `data:image/jpeg;base64,${data.data}`;
+            img.style.display = 'block';
+            placeholder.style.display = 'none';
             
-            // カウンター更新
-            document.getElementById('selected-count').innerText = selectedPhotoIds.length;
+            // ダウンロードボタンを準備
+            setupDownloadButton(fileId, linkId, filename);
         }
+    })
+    .catch(err => {
+        console.error(err);
+        document.getElementById(placeholderId).innerText = "読込失敗";
+    });
+}
 
-        // --- 注文送信処理 ---
-        function submitOrder() {
-            const branch = document.getElementById('branch-input').value;
-            const name = document.getElementById('name-input').value;
-            const msgDiv = document.getElementById('order-msg');
-
-            msgDiv.innerText = "";
-
-            // 入力チェック
-            if (selectedPhotoIds.length === 0) {
-                alert("写真が1枚も選択されていません。\n画像をクリックして選択してください（青枠がつきます）。");
-                return;
+// ダウンロードボタンの設定
+function setupDownloadButton(fileId, linkId, filename) {
+    const link = document.getElementById(linkId);
+    link.classList.remove('disabled');
+    link.innerText = 'ダウンロード';
+    
+    link.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation(); // 親要素のクリックイベント防止
+        
+        link.innerText = '準備中...';
+        link.classList.add('disabled');
+        
+        fetch(`${GAS_URL}?fileId=${fileId}&type=download`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const dataUrl = `data:${data.mime};base64,${data.data}`;
+                const a = document.createElement('a');
+                a.href = dataUrl;
+                a.download = filename;
+                a.click();
+                
+                link.innerText = 'ダウンロード';
+                link.classList.remove('disabled');
             }
-            if (!branch || !name) {
-                alert("「支部名」と「お名前」を入力してください。");
-                return;
-            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('ダウンロードに失敗しました');
+            link.innerText = 'ダウンロード';
+            link.classList.remove('disabled');
+        });
+    };
+}
 
-            // 確認ダイアログ
-            if (!confirm(`【確認】\n\n支部名: ${branch}\n氏名: ${name}\n\n写真 ${selectedPhotoIds.length} 枚を注文しますか？`)) {
-                return;
-            }
+function toggleSelection(id) {
+    const card = document.getElementById(`card-${id}`);
+    const idStr = String(id);
 
-            msgDiv.innerText = "送信中...";
-            msgDiv.style.color = "black";
+    if (selectedPhotoIds.includes(idStr)) {
+        selectedPhotoIds = selectedPhotoIds.filter(item => item !== idStr);
+        card.classList.remove('selected');
+    } else {
+        selectedPhotoIds.push(idStr);
+        card.classList.add('selected');
+    }
+    
+    document.getElementById('selected-count').innerText = selectedPhotoIds.length;
+}
 
-            // GASへ注文データを送信
-            fetch(GAS_URL, {
-                method: "POST",
-                body: JSON.stringify({
-                    action: "order",
-                    branch: branch,
-                    name: name,
-                    selectedPhotos: selectedPhotoIds
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    msgDiv.innerText = "送信完了しました！";
-                    msgDiv.style.color = "green";
-                    alert("ご注文ありがとうございます。\n申し込みを受け付けました。");
-                    
-                    // フォームをリセット（必要に応じて）
-                    selectedPhotoIds = [];
-                    document.querySelectorAll('.photo-card').forEach(c => c.classList.remove('selected'));
-                    document.getElementById('selected-count').innerText = "0";
-                    document.getElementById('name-input').value = "";
-                } else {
-                    msgDiv.innerText = "サーバーエラー: " + data.message;
-                    msgDiv.style.color = "red";
-                }
-            })
-            .catch(err => {
-                msgDiv.innerText = "通信エラーが発生しました";
-                msgDiv.style.color = "red";
-            });
+function submitOrder() {
+    const branch = document.getElementById('branch-input').value;
+    const name = document.getElementById('name-input').value;
+    const msgDiv = document.getElementById('order-msg');
+
+    msgDiv.innerText = "";
+
+    if (selectedPhotoIds.length === 0) {
+        alert("写真が1枚も選択されていません。\n画像をクリックして選択してください（青枠がつきます）。");
+        return;
+    }
+    if (!branch || !name) {
+        alert("「支部名」と「お名前」を入力してください。");
+        return;
+    }
+
+    if (!confirm(`【確認】\n\n支部名: ${branch}\n氏名: ${name}\n\n写真 ${selectedPhotoIds.length} 枚を注文しますか？`)) {
+        return;
+    }
+
+    msgDiv.innerText = "送信中...";
+    msgDiv.style.color = "black";
+
+    fetch(GAS_URL, {
+        method: "POST",
+        body: JSON.stringify({
+            action: "order",
+            branch: branch,
+            name: name,
+            selectedPhotos: selectedPhotoIds
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            msgDiv.innerText = "送信完了しました！";
+            msgDiv.style.color = "green";
+            alert("ご注文ありがとうございます。\n申し込みを受け付けました。");
+            
+            selectedPhotoIds = [];
+            document.querySelectorAll('.photo-card').forEach(c => c.classList.remove('selected'));
+            document.getElementById('selected-count').innerText = "0";
+            document.getElementById('name-input').value = "";
+        } else {
+            msgDiv.innerText = "サーバーエラー: " + data.message;
+            msgDiv.style.color = "red";
         }
-    </script>
-</body>
-</html>
+    })
+    .catch(err => {
+        msgDiv.innerText = "通信エラーが発生しました";
+        msgDiv.style.color = "red";
+    });
+}
