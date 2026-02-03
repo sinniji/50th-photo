@@ -235,17 +235,27 @@ function loadThumbnail(fileId, imgId, placeholderId, linkId, filename) {
             img.style.display = 'block';
             placeholder.style.display = 'none';
 
-            // ここで初めてダウンロードボタンを有効化し、クリックイベントを設定
+            // ダウンロードボタン有効化
             const link = document.getElementById(linkId);
             link.innerText = "高画質ダウンロード";
-            link.style.backgroundColor = "#28a745"; // 緑色に
+            link.style.backgroundColor = "#28a745"; 
             
-            // クリック時に初めて「フルサイズ」を取りに行く
             link.onclick = (e) => {
                 e.preventDefault();
                 downloadFullImage(fileId, filename, link);
             };
+        } else {
+            // 【追加】エラーだった場合の表示処理
+            console.error("Thumb Error:", data.message); // コンソールに詳細を表示
+            const placeholder = document.getElementById(placeholderId);
+            placeholder.innerHTML = "<span style='color:red; font-size:10px;'>Error</span>";
         }
+    })
+    .catch(err => {
+        // 【追加】通信エラー等の場合
+        console.error("Fetch Error:", err);
+        const placeholder = document.getElementById(placeholderId);
+        placeholder.innerHTML = "<span style='color:red; font-size:10px;'>Net Err</span>";
     });
 }
 
