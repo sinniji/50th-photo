@@ -180,47 +180,35 @@
         }
 
         // --- ギャラリー表示処理 ---
-        function showGallery(photoList) {
-            // 画面切り替え
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('gallery-screen').style.display = 'block';
+function showGallery(photoList) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('gallery-screen').style.display = 'block';
+    
+    const container = document.getElementById('photo-container');
+    container.innerHTML = "";
+
+    photoList.forEach(photo => {
+        const card = document.createElement('div');
+        card.className = 'photo-card';
+        card.id = `card-${photo.id}`;
+
+        card.innerHTML = `
+            <div class="img-area" onclick="toggleSelection('${photo.id}')">
+                <div class="check-mark">✔</div>
+                <img src="${photo.thumbnailUrl}" 
+                     style="width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:4px;" 
+                     alt="${photo.filename}"
+                     loading="lazy">
+            </div>
             
-            const container = document.getElementById('photo-container');
-            container.innerHTML = ""; // クリア
-
-            photoList.forEach(photo => {
-                // カード要素作成
-                const card = document.createElement('div');
-                card.className = 'photo-card';
-                card.id = `card-${photo.id}`; // 選択スタイル用ID
-
-                const imgId = `img-${photo.fileId}`;
-                const linkId = `dl-${photo.fileId}`;
-                const placeholderId = `place-${photo.fileId}`;
-
-                card.innerHTML = `
-                    <div class="img-area" onclick="toggleSelection('${photo.id}')">
-                        <div class="check-mark">✔</div>
-                        
-                        <div id="${placeholderId}" style="height:160px; display:flex; align-items:center; justify-content:center; background:#eee; color:#999;">
-                            <span style="font-size:12px;">読込中...</span>
-                        </div>
-                        
-                        <img id="${imgId}" style="display:none; width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:4px;" alt="${photo.filename}">
-                    </div>
-                    
-                    <span class="serial-number">No. ${photo.id}</span>
-                    
-                    <a id="${linkId}" href="#" class="download-btn disabled" download="${photo.filename}">ダウンロード</a>
-                `;
-                
-                container.appendChild(card);
-
-                // 画像の実体を遅延ロード
-                loadImage(photo.fileId, imgId, linkId, placeholderId);
-            });
-        }
-
+            <span class="serial-number">No. ${photo.id}</span>
+            
+            <a href="${photo.downloadUrl}" class="download-btn" download="${photo.filename}">ダウンロード</a>
+        `;
+        
+        container.appendChild(card);
+    });
+}
         // --- 個別の画像をロードする関数 ---
         function loadImage(fileId, imgId, linkId, placeholderId) {
             fetch(`${GAS_URL}?fileId=${fileId}`)
