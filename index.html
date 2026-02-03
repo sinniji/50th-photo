@@ -208,7 +208,8 @@
         }
 
         // --- ギャラリー表示処理 ---
-function showGallery(photoList) {
+// --- ギャラリー表示処理（高速化対応版） ---
+    function showGallery(photoList) {
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('gallery-screen').style.display = 'block';
         
@@ -221,17 +222,21 @@ function showGallery(photoList) {
             card.id = `card-${photo.id}`;
 
             const imgId = `img-${photo.fileId}`;
-            const placeholderId = `place-${photo.fileId}`;
+            
+            // サムネイルデータがある場合とない場合(エラー)の処理
+            let imgTag = "";
+            if (photo.thumbData) {
+                // すでにデータを持っているので src に直接入れる
+                imgTag = `<img id="${imgId}" src="${photo.thumbData}" style="display:block; width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:4px;" alt="${photo.filename}">`;
+            } else {
+                // 取得失敗時
+                imgTag = `<div style="height:160px; display:flex; align-items:center; justify-content:center; background:#eee; color:#999;">No Image</div>`;
+            }
 
             card.innerHTML = `
                 <div class="img-area" onclick="toggleSelection('${photo.id}')">
                     <div class="check-mark">✔</div>
-                    
-                    <div id="${placeholderId}" style="height:160px; display:flex; align-items:center; justify-content:center; background:#eee; color:#999;">
-                        <span style="font-size:12px;">読込中...</span>
-                    </div>
-                    
-                    <img id="${imgId}" style="display:none; width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:4px;" alt="${photo.filename}">
+                    ${imgTag}
                 </div>
                 
                 <span class="serial-number">No. ${photo.id}</span>
@@ -242,32 +247,8 @@ function showGallery(photoList) {
             `;
             
             container.appendChild(card);
-
-            // ★変更点：サムネイルをロードするように指定
-            loadThumbnail(photo.fileId, imgId, placeholderId);
-        });
-    }
-
-    // --- サムネイル読込用 ---
-    function loadThumbnail(fileId, imgId, placeholderId) {
-        // type=thumb を付与
-        fetch(`${GAS_URL}?fileId=${fileId}&type=thumb`)
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                const img = document.getElementById(imgId);
-                const placeholder = document.getElementById(placeholderId);
-                
-                const dataUrl = `data:${data.mime};base64,${data.data}`;
-                img.src = dataUrl;
-                img.style.display = 'block';
-                placeholder.style.display = 'none';
-            } else {
-                document.getElementById(placeholderId).innerText = "Err";
-            }
-        })
-        .catch(err => {
-            console.error(err);
+            
+            // ★以前あった loadThumbnail() の呼び出しは不要になり、削除
         });
     }
 
