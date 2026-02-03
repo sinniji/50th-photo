@@ -209,36 +209,6 @@ function showGallery(photoList) {
         container.appendChild(card);
     });
 }
-        // --- 個別の画像をロードする関数 ---
-        function loadImage(fileId, imgId, linkId, placeholderId) {
-            fetch(`${GAS_URL}?fileId=${fileId}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    const img = document.getElementById(imgId);
-                    const link = document.getElementById(linkId);
-                    const placeholder = document.getElementById(placeholderId);
-                    
-                    // Base64データをセット
-                    const dataUrl = `data:${data.mime};base64,${data.data}`;
-                    
-                    img.src = dataUrl;
-                    img.style.display = 'block';
-                    placeholder.style.display = 'none';
-                    
-                    // ダウンロードリンクを有効化
-                    link.href = dataUrl;
-                    link.classList.remove('disabled');
-                    link.innerText = "ダウンロード";
-                } else {
-                    document.getElementById(placeholderId).innerText = "Err";
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                document.getElementById(placeholderId).innerText = "Fail";
-            });
-        }
 
         // --- 写真の選択/解除処理 ---
         function toggleSelection(id) {
