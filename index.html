@@ -66,18 +66,46 @@
             display: block; font-weight: bold; margin-top: 8px; text-align: center; font-size: 1.1em;
         }
 
-        /* --- ダウンロードボタン（緑色） --- */
+/* --- ダウンロードボタン（緑色） --- */
         .download-btn {
-            display: none; /* ロード完了まで隠す */
-            display: block; /* レイアウト確保用 */
-            width: 100%; box-sizing: border-box;
-            margin-top: 10px; padding: 8px;
-            background-color: #28a745; color: white; text-decoration: none;
-            border-radius: 4px; text-align: center; font-size: 14px; font-weight: bold;
-        }
-        .download-btn:hover { background-color: #218838; }
-        .download-btn.disabled { background-color: #ccc; pointer-events: none; }
+            display: block;
+            width: 100%; 
+            box-sizing: border-box;
+            margin-top: 10px; 
+            padding: 10px; /* 少しタップしやすく調整 */
+            
+            /* 色設定 */
+            background-color: #28a745; 
+            color: white; 
+            
+            /* フォント・形状 */
+            border-radius: 4px; 
+            text-align: center; 
+            font-size: 14px; 
+            font-weight: bold;
 
+            /* ★buttonタグ用に新たに追加・変更した部分★ */
+            border: none;           /* デフォルトの立体的な枠線を消す */
+            cursor: pointer;        /* マウスを乗せた時に指マークにする */
+            font-family: inherit;   /* ページ全体のフォントを引き継ぐ */
+            appearance: none;       /* OS標準のボタン装飾をリセット */
+            line-height: 1.5;       /* 文字の縦位置調整 */
+        }
+
+        /* ホバー時のスタイル */
+        .download-btn:hover { 
+            background-color: #218838; 
+        }
+
+        /* 無効化（ダウンロード処理中）のスタイル */
+        /* JSで disabled = true になると自動的に適用されます */
+        .download-btn:disabled { 
+            background-color: #ccc; 
+            color: #666;
+            cursor: not-allowed;    /* 押せないマークを表示 */
+            opacity: 0.8;
+        }
+        
         /* --- 注文フォームエリア --- */
         #order-form-container {
             background: white; padding: 30px; border-radius: 12px; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
@@ -251,7 +279,6 @@ function showGallery(photoList) {
         
         btn.innerText = "準備中...";
         btn.disabled = true;
-        btn.style.backgroundColor = "#ccc";
 
         fetch(`${GAS_URL}?fileId=${fileId}&type=full`)
         .then(res => res.json())
@@ -275,7 +302,6 @@ function showGallery(photoList) {
             // ボタンを元に戻す
             btn.innerText = originalText;
             btn.disabled = false;
-            btn.style.backgroundColor = ""; // CSSのデフォに戻る
         });
     }
         // --- 写真の選択/解除処理 ---
