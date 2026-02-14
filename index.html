@@ -82,20 +82,29 @@
         }
         .download-btn:hover { background-color: #218838; }
 
-        /* --- 注文フォームエリア (既存のまま) --- */
+        /* --- 注文フォームエリア --- */
         #order-form-container {
             background: white; padding: 30px; border-radius: 12px; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
             border-top: 4px solid #ff9900;
         }
         .form-group { margin-bottom: 20px; }
         .form-label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        
         #selected-count-display {
-            font-size: 1.2em; margin-bottom: 20px; padding: 10px; background: #fff3cd; border-radius: 4px; color: #856404;
+            font-size: 1.1em; margin-bottom: 20px; padding: 15px; background: #fff3cd; border-radius: 4px; color: #856404;
+            line-height: 1.6;
         }
+        
         button.order-btn {
             width: 100%; padding: 15px; background-color: #ff9900; color: white; border: none; border-radius: 6px; font-size: 18px; font-weight: bold; cursor: pointer;
         }
         button.order-btn:hover { background-color: #e68a00; }
+
+        /* モバイル対応：金額表示を改行するための補助 */
+        @media (max-width: 600px) {
+            .price-break { display: block; margin-top: 5px; }
+            .price-separator { display: none; }
+        }
         
     </style>
 </head>
@@ -114,7 +123,8 @@
         <h2>写真一覧</h2>
         <p style="text-align: center; font-size: 0.9em; color: #666;">
             「ダウンロード」ボタンで画像を保存できます。<br>
-            焼き増し写真希望の場合、写真をクリックして選択し注文してください。
+            焼き増し写真希望の場合、写真をクリックして選択し注文してください。<br>
+            <strong>（焼き増し：1枚 100円）</strong>
         </p>
 
         <div class="gallery-grid" id="photo-container">
@@ -125,6 +135,11 @@
             
             <div id="selected-count-display">
                 現在選択中の枚数： <span id="selected-count" style="font-weight:bold; font-size:1.5em;">0</span> 枚
+                
+                <span class="price-separator" style="margin: 0 10px; color: #ccc;">|</span>
+                <span class="price-break">
+                    合計金額： <span id="total-price" style="font-weight:bold; font-size:1.5em; color: #d93025;">0</span> 円
+                </span>
             </div>
 
             <div class="form-group">
@@ -146,6 +161,9 @@
         // ★ご自身のGASのURLに書き換えてください
         const GAS_URL = "https://script.google.com/macros/s/AKfycbzYUM7Jx2kpzQ_AT8ELcR8D3zzf0Cl-IQXJw-lFT51gqz6fzYpgUT24Q7MG0GtA4FFW/exec"; 
 
+        // ★写真1枚あたりの金額設定
+        const PRICE_PER_PHOTO = 100;
+
         let selectedPhotoIds = [];
 
         // --- ログイン処理 ---
@@ -159,14 +177,12 @@
 
             fetch(GAS_URL, {
                 method: "POST",
-                // ★CORS対策モード指定 (no-corsは使わない)
                 body: JSON.stringify({ action: "login", password: password })
             })
             .then(response => response.json())
             .then(data => {
                 loading.style.display = "none";
                 if (data.status === 'success') {
-                    // ★データの中にURLも全て入っているため、ここで渡すだけ
                     showGallery(data.data);
                 } else if (data.status === 'auth_failed') {
                     errorMsg.innerText = "パスワードが間違っています。";
@@ -189,7 +205,6 @@
             const container = document.getElementById('photo-container');
             container.innerHTML = ""; 
 
-            // IntersectionObserverの設定（画面に入った時にsrcをセットする）
             const observer = new IntersectionObserver((entries, obs) => {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
@@ -198,21 +213,18 @@
                         if (srcUrl) {
                             img.src = srcUrl;
                             img.onload = () => img.classList.add('loaded');
-                            img.removeAttribute('data-src'); // 処理済みマーク
+                            img.removeAttribute('data-src');
                         }
                         obs.unobserve(img);
                     }
                 });
-            }, { rootMargin: "200px" }); // 少し手前で読み込み開始
+            }, { rootMargin: "200px" });
 
             photoList.forEach(photo => {
                 const card = document.createElement('div');
                 card.className = 'photo-card';
                 card.id = `card-${photo.id}`;
 
-                // HTML生成
-                // GASは通さず、thumbUrl(GoogleのCDN)を直接指定
-                // referrerPolicy="no-referrer" はGoogle画像読み込み時の認証エラー回避のおまじない
                 card.innerHTML = `
                     <div class="img-area" onclick="toggleSelection('${photo.id}')">
                         <div class="check-mark">✔</div>
@@ -227,7 +239,6 @@
                 
                 container.appendChild(card);
                 
-                // 画像監視開始
                 const img = card.querySelector('img');
                 observer.observe(img);
             });
@@ -245,7 +256,16 @@
                 selectedPhotoIds.push(idStr);
                 card.classList.add('selected');
             }
-            document.getElementById('selected-count').innerText = selectedPhotoIds.length;
+            updatePriceDisplay();
+        }
+
+        // ★金額と枚数の表示更新用関数
+        function updatePriceDisplay() {
+            const count = selectedPhotoIds.length;
+            const total = count * PRICE_PER_PHOTO;
+            
+            document.getElementById('selected-count').innerText = count;
+            document.getElementById('total-price').innerText = total.toLocaleString();
         }
 
         // --- 注文送信処理 ---
@@ -265,7 +285,11 @@
                 return;
             }
 
-            if (!confirm(`【確認】\n\n支部名: ${branch}\n氏名: ${name}\n\n写真 ${selectedPhotoIds.length} 枚を注文しますか？`)) {
+            // ★確認ダイアログに金額を表示
+            const count = selectedPhotoIds.length;
+            const totalAmount = count * PRICE_PER_PHOTO;
+
+            if (!confirm(`【確認】\n\n支部名: ${branch}\n氏名: ${name}\n\n--------------------\n注文枚数: ${count} 枚\n合計金額: ${totalAmount.toLocaleString()} 円\n--------------------\n\nこの内容で注文しますか？`)) {
                 return;
             }
 
@@ -291,8 +315,11 @@
                     // リセット
                     selectedPhotoIds = [];
                     document.querySelectorAll('.photo-card').forEach(c => c.classList.remove('selected'));
-                    document.getElementById('selected-count').innerText = "0";
                     document.getElementById('name-input').value = "";
+                    
+                    // ★金額表示もリセット
+                    updatePriceDisplay();
+
                 } else {
                     msgDiv.innerText = "サーバーエラー: " + data.message;
                     msgDiv.style.color = "red";
